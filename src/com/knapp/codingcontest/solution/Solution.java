@@ -24,174 +24,167 @@ import com.knapp.codingcontest.operations.Operations;
 
 /**
  * This is the code YOU have to provide
- *
+ * <p>
  * param warehouse all the operations you should need -> Annotation
  */
 public class Solution {
-  public String getParticipantName() {
-    return "STERNAD Florian";
-  }
-
-  public Institute getParticipantInstitution() {
-    return Institute.HTBLA_Kaindorf_Sulm;
-  }
-
-  // ----------------------------------------------------------------------------
-
-  protected final InputData input;
-  protected final Operations operations;
-
-  // ----------------------------------------------------------------------------
-
-  public Solution(final InputData input, final Operations operations) {
-    this.input = input;
-    this.operations = operations;
-
-    // TODO: prepare data structures (but may also be done in run() method below)
-  }
-
-  // ----------------------------------------------------------------------------
-
-  /**
-   * The main entry-point.
-   *
-   * calculation for shipments costs:
-   *    total_cost = sum{products per warehouse/customer} ((cost_base + (sum(size_products) * cost_size)) * distanz_warehouse_to_customer)
-   *
-   * some hints:
-   *   - one shipments is: all products for one customer from one warehouse (will be handled and calculated automatically/internally)
-   *   - there are finite amounts of product stocks in the warehouses (stock will be adjusted automatically by using op.ship() method)
-   *   - not all warehouses have all products on stock - or stock might run out (may be checked via wh.hasStock())
-   *
-   * optimization is possible along two factors:
-   *   - minimize warehouse/customer pairs (#shipments) - reduce cost_base impact on total costs
-   *   - minimize distances - shipments from closer warehouses are cheaper
-   *
-   * some ideas for finding a better solution:
-   *   sometimes it might be beneficial to split an order to have most delivered from close warehouse and only some from farther
-   *   instead of trying to deliver everything from just one warehouse that is far away
-   */
-  public void run() throws Exception {
-    Map<Customer, List<OrderLine>> ordersPerCustomer = new LinkedHashMap<>();
-
-    List<Customer> old = input.getOrderLines().stream().map(OrderLine::getCustomer).toList();
-    List<Customer> customers = new ArrayList<>(old);
-
-    for (Customer c : customers) {
-      ordersPerCustomer.put(
-              c,
-              input.getOrderLines().stream().filter(e -> e.getCustomer().equals(c)).toList()
-      );
+    public String getParticipantName() {
+        return "STERNAD Florian";
     }
 
-    Map<Customer, List<OrderLine>> anotherMap = new LinkedHashMap<>();
-
-    customers = customers.stream().sorted((o1, o2) -> ordersPerCustomer.get(o2).size() - ordersPerCustomer.get(o1).size()).toList();
-
-    for (Customer c : customers) {
-      anotherMap.put(
-              c, ordersPerCustomer.get(c)
-      );
+    public Institute getParticipantInstitution() {
+        return Institute.HTBLA_Kaindorf_Sulm;
     }
 
-    for (Map.Entry<Customer, List<OrderLine>> entry : anotherMap.entrySet()) {
+    // ----------------------------------------------------------------------------
 
-      //System.out.printf("%s - %d\n", entry.getKey().getCode(), entry.getValue().size());
+    protected final InputData input;
+    protected final Operations operations;
 
-      Position customerPosition = entry.getKey().getPosition();
+    // ----------------------------------------------------------------------------
 
-      List<OrderLine> olines = entry.getValue().stream().sorted((o1, o2) -> o2.getProduct().getSize() - o1.getProduct().getSize()).toList();
+    public Solution(final InputData input, final Operations operations) {
+        this.input = input;
+        this.operations = operations;
 
-      for (OrderLine ol : olines) {
-        Product product = ol.getProduct();
+        // TODO: prepare data structures (but may also be done in run() method below)
+    }
 
+    // ----------------------------------------------------------------------------
 
-        List<Warehouse> warehouses = new ArrayList<>(
-                input.getWarehouses().stream().filter(
-                        e -> e.hasStock(product)).toList()
-        );
+    /**
+     * The main entry-point.
+     * <p>
+     * calculation for shipments costs:
+     * total_cost = sum{products per warehouse/customer} ((cost_base + (sum(size_products) * cost_size)) * distanz_warehouse_to_customer)
+     * <p>
+     * some hints:
+     * - one shipments is: all products for one customer from one warehouse (will be handled and calculated automatically/internally)
+     * - there are finite amounts of product stocks in the warehouses (stock will be adjusted automatically by using op.ship() method)
+     * - not all warehouses have all products on stock - or stock might run out (may be checked via wh.hasStock())
+     * <p>
+     * optimization is possible along two factors:
+     * - minimize warehouse/customer pairs (#shipments) - reduce cost_base impact on total costs
+     * - minimize distances - shipments from closer warehouses are cheaper
+     * <p>
+     * some ideas for finding a better solution:
+     * sometimes it might be beneficial to split an order to have most delivered from close warehouse and only some from farther
+     * instead of trying to deliver everything from just one warehouse that is far away
+     */
+    public void run() throws Exception {
+        List<Customer> customers = input.getOrderLines()
+                .stream()
+                .map(OrderLine::getCustomer)
+                .toList();
 
-        // Get smallest difference
-        // double diff = warehouses.stream().map(e -> e.getPosition().calculateDistance(customerPosition)).toList()
-        //        .stream().min(Double::compare).get();
+        Map<Customer, List<OrderLine>> customerMap = new HashMap<>();
 
-        List<Double> diffs = warehouses.stream().map(e -> e.getPosition().calculateDistance(customerPosition))
-                .sorted(Double::compare).toList();
-
-        System.out.println(diffs.size());
-
-        int max = olines.get(0).getProduct().getSize();
-
-        for (int i = 1; i < olines.size(); i++) {
-          int s = olines.get(i).getProduct().getSize();
-
-          if (s > max) {
-            max = s;
-          }
+        for (Customer c : customers) {
+            customerMap.put(
+                    c,
+                    input.getOrderLines()
+                            .stream()
+                            .filter(e -> e.getCustomer().equals(c))
+                            .sorted((e1, e2) -> e2.getProduct().getSize() - e1.getProduct().getSize())
+                            .toList()
+            );
         }
 
-        // Get Warehouse with smallest Diff
-        Warehouse wh = warehouses.stream()
-                .filter(e -> e.getPosition().calculateDistance(customerPosition) == diffs.get(0)).findFirst().get();
+        Map<Customer, List<OrderLine>> orderMap = new LinkedHashMap<>();
 
-        operations.ship(ol, wh);
-      }
+        customers = customers.stream()
+                .sorted((c1, c2) -> customerMap.get(c2).size() - customerMap.get(c1).size())
+                .toList();
+
+        for (Customer c : customers) {
+            orderMap.put(c, customerMap.get(c));
+        }
+
+        for (Map.Entry<Customer, List<OrderLine>> entry : orderMap.entrySet()) {
+            Customer customer = entry.getKey();
+
+            Position customerPosition = customer.getPosition();
+
+            for (OrderLine oline : entry.getValue()) {
+                Product product = oline.getProduct();
+
+                List<Warehouse> warehouses = input.getWarehouses()
+                        .stream()
+                        .filter(e -> e.hasStock(product))
+                        .toList();
+
+
+                List<Double> diffs = warehouses
+                        .stream()
+                        .map(e -> e.getPosition().calculateDistance(customerPosition))
+                        .sorted(Double::compareTo)
+                        .toList();
+
+
+                Warehouse nearestWarehouse = warehouses
+                        .stream()
+                        .filter(e -> e.getPosition().calculateDistance(customerPosition) == diffs.get(0))
+                        .findFirst().get();
+
+
+                operations.ship(oline, nearestWarehouse);
+            }
+        }
+
     }
-  }
 
-  // ----------------------------------------------------------------------------
-  // ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
 
-  /**
-   * Just for documentation purposes.
-   *
-   * Method may be removed without any side-effects
-   *
-   *   divided into 4 sections
-   *
-   *     <li><em>input methods</em>
-   *
-   *     <li><em>main interaction methods</em>
-   *         - these methods are the ones that make (explicit) changes to the warehouse
-   *
-   *     <li><em>information</em>
-   *         - information you might need for your solution
-   *
-   *     <li><em>additional information</em>
-   *         - various other infos: statistics, information about (current) costs, ...
-   *
-   */
-  @SuppressWarnings("unused")
-  private void apis() throws Exception {
-    // ----- input -----
+    /**
+     * Just for documentation purposes.
+     * <p>
+     * Method may be removed without any side-effects
+     * <p>
+     * divided into 4 sections
+     *
+     * <li><em>input methods</em>
+     *
+     * <li><em>main interaction methods</em>
+     * - these methods are the ones that make (explicit) changes to the warehouse
+     *
+     * <li><em>information</em>
+     * - information you might need for your solution
+     *
+     * <li><em>additional information</em>
+     * - various other infos: statistics, information about (current) costs, ...
+     */
+    @SuppressWarnings("unused")
+    private void apis() throws Exception {
+        // ----- input -----
 
-    final List<OrderLine> orderLines = input.getOrderLines();
-    final List<Warehouse> warehouses = input.getWarehouses();
+        final List<OrderLine> orderLines = input.getOrderLines();
+        final List<Warehouse> warehouses = input.getWarehouses();
 
-    final OrderLine orderLine = orderLines.get(0);
-    final Warehouse warehouse = warehouses.get(0);
+        final OrderLine orderLine = orderLines.get(0);
+        final Warehouse warehouse = warehouses.get(0);
 
-    // ----- main interaction methods -----
+        // ----- main interaction methods -----
 
-    operations.ship(orderLine, warehouse); // throws OrderLineAlreadyPackedException, NoStockInWarehouseException;
+        operations.ship(orderLine, warehouse); // throws OrderLineAlreadyPackedException, NoStockInWarehouseException;
 
-    // ----- information -----
+        // ----- information -----
 
-    final boolean hasStock = warehouse.hasStock(orderLine.getProduct());
-    final Map<Product, Integer> currentStocks = warehouse.getCurrentStocks();
+        final boolean hasStock = warehouse.hasStock(orderLine.getProduct());
+        final Map<Product, Integer> currentStocks = warehouse.getCurrentStocks();
 
-    final double distance = orderLine.getCustomer().getPosition().calculateDistance(warehouse.getPosition());
+        final double distance = orderLine.getCustomer().getPosition().calculateDistance(warehouse.getPosition());
 
-    // ----- additional information -----
+        // ----- additional information -----
 
-    final CostFactors costFactors = operations.getCostFactors();
+        final CostFactors costFactors = operations.getCostFactors();
 
-    final InfoSnapshot info = operations.getInfoSnapshot();
-    final int unfinishedOrderLineCount = info.getUnfinishedOrderLineCount();
-    final double unfinishedOrderLinesCost = info.getUnfinishedOrderLinesCost();
-    final double shipmentsCost = info.getShipmentsCost();
-    final double totalCost = info.getTotalCost();
-  }
+        final InfoSnapshot info = operations.getInfoSnapshot();
+        final int unfinishedOrderLineCount = info.getUnfinishedOrderLineCount();
+        final double unfinishedOrderLinesCost = info.getUnfinishedOrderLinesCost();
+        final double shipmentsCost = info.getShipmentsCost();
+        final double totalCost = info.getTotalCost();
+    }
 
-  // ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
 }
